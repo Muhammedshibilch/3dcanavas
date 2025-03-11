@@ -9,7 +9,7 @@ function LeftPanel({ onFileUpload }) {
     };
   
     return (
-      <div className="left-panel">
+      <div className="left-panel" style={{backgroundColor:"yellow"}}>
         <div className="file-upload">
           <div className="file-label">LOAD</div>
           <svg 

@@ -11,8 +11,6 @@ function App() {
   const canvasRef = useRef(null);
 
   const handleFileUpload = (file) => {
-    // This function will pass the file to the ThreeCanvas component
-    // We're just storing the file reference for now
     setModel(file);
   };
 
@@ -21,7 +19,6 @@ function App() {
   };
 
   const fitModelToView = () => {
-    // This function will be passed to the ThreeCanvas component
     if (canvasRef.current && canvasRef.current.fitToView) {
       canvasRef.current.fitToView();
     }

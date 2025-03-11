@@ -14,16 +14,13 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
   const modelRef = useRef(null);
   const boundingBoxRef = useRef(null);
 
-  // Initialize Three.js scene
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // Create scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
+    scene.background = new THREE.Color(0xf5f5f5);
     sceneRef.current = scene;
 
-    // Create camera
     const camera = new THREE.PerspectiveCamera(
       75,
       mountRef.current.clientWidth / mountRef.current.clientHeight,
@@ -33,19 +30,22 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
     camera.position.z = 5;
     cameraRef.current = camera;
 
-    // Create renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    
+    while (mountRef.current.firstChild) {
+      mountRef.current.removeChild(mountRef.current.firstChild);
+    }
+    
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Add orbit controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controlsRef.current = controls;
 
-    // Create lights
     const ambientLight = new THREE.AmbientLight(0x404040, 1);
     scene.add(ambientLight);
 
@@ -57,11 +57,9 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
     backLight.position.set(-1, -1, -1);
     scene.add(backLight);
 
-    // Add axes helper
-    const axesHelper = new THREE.AxesHelper(5);
+    const axesHelper = new THREE.AxesHelper(2);
     scene.add(axesHelper);
 
-    // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
       if (controlsRef.current) {
@@ -73,7 +71,6 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
     };
     animate();
 
-    // Handle window resize
     const handleResize = () => {
       if (
         mountRef.current &&
@@ -90,7 +87,6 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
     };
     window.addEventListener('resize', handleResize);
 
-    // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
       if (mountRef.current && rendererRef.current) {
@@ -110,11 +106,9 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
     };
   }, []);
 
-  // Load model when it changes
   useEffect(() => {
     if (!model || !sceneRef.current) return;
 
-    // Remove previous model if it exists
     if (modelRef.current) {
       sceneRef.current.remove(modelRef.current);
       modelRef.current.traverse((object) => {
@@ -132,7 +126,6 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
     if (fileExtension === 'glb' || fileExtension === 'gltf') {
       const loader = new GLTFLoader();
 
-      // Set up DRACO loader
       const dracoLoader = new DRACOLoader();
       dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
       loader.setDRACOLoader(dracoLoader);
@@ -143,13 +136,17 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
           modelRef.current = gltf.scene;
           sceneRef.current.add(modelRef.current);
           
-          // Create bounding box
           boundingBoxRef.current = new THREE.Box3().setFromObject(modelRef.current);
           
-          // Fit to view
+          const center = new THREE.Vector3();
+          boundingBoxRef.current.getCenter(center);
+          modelRef.current.position.sub(center);
+          
           fitToView();
         },
-        undefined,
+        (xhr) => {
+          console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+        },
         (error) => {
           console.error('Error loading GLTF model:', error);
         }
@@ -162,33 +159,34 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
           modelRef.current = obj;
           sceneRef.current.add(modelRef.current);
           
-          // Create bounding box
           boundingBoxRef.current = new THREE.Box3().setFromObject(modelRef.current);
           
-          // Fit to view
+          const center = new THREE.Vector3();
+          boundingBoxRef.current.getCenter(center);
+          modelRef.current.position.sub(center);
+          
           fitToView();
         },
-        undefined,
+        (xhr) => {
+          console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+        },
         (error) => {
           console.error('Error loading OBJ model:', error);
         }
       );
     }
 
-    // Cleanup
     return () => {
       URL.revokeObjectURL(fileURL);
     };
   }, [model]);
 
-  // Toggle model visibility
   useEffect(() => {
     if (modelRef.current) {
       modelRef.current.visible = isVisible;
     }
   }, [isVisible]);
 
-  // Fit model to view
   const fitToView = () => {
     if (
       modelRef.current &&
@@ -196,7 +194,6 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
       cameraRef.current &&
       controlsRef.current
     ) {
-      // Update bounding box
       boundingBoxRef.current.setFromObject(modelRef.current);
       
       const center = new THREE.Vector3();
@@ -205,31 +202,26 @@ const ThreeCanvas = forwardRef(({ model, isVisible }, ref) => {
       const size = new THREE.Vector3();
       boundingBoxRef.current.getSize(size);
       
-      // Get the longest side
       const maxDim = Math.max(size.x, size.y, size.z);
-      const fov = cameraRef.current.fov * (Math.PI / 180);
+      const fov = cameraRef.current.fov * (Math.PI / 250);
       let cameraDistance = (maxDim / 2) / Math.tan(fov / 2);
       
-      // Add some padding
       cameraDistance *= 1.2;
       
-      // Position camera
-      cameraRef.current.position.copy(center);
-      cameraRef.current.position.z += cameraDistance;
-      cameraRef.current.lookAt(center);
+      const offset = new THREE.Vector3(0, 0, cameraDistance);
+      cameraRef.current.position.copy(offset);
+      cameraRef.current.lookAt(new THREE.Vector3(0, 0, 0));
       
-      // Update controls
-      controlsRef.current.target.copy(center);
+      controlsRef.current.target.set(0, 0, 0);
       controlsRef.current.update();
     }
   };
 
-  // Expose functions to parent component
   useImperativeHandle(ref, () => ({
     fitToView
   }));
 
-  return <div ref={mountRef} style={{ width: '100%', height: '100%' }} />;
+  return <div ref={mountRef} style={{ width: '100%', height: '100%', overflow: 'hidden' }} />;
 });
 
 export default ThreeCanvas;
